@@ -1,4 +1,12 @@
+/***************************************************************************
+** File: linked_list.c
+** Author: Allen Benjamin
+** Date: 01/04/2021
+** Description: Basic linked list for holding movies
+**************************************************************************/
+
 #include "linked_list.h"
+#include <stdlib.h>
 
 struct linked_list* linked_list_init() {
     struct linked_list* ll = malloc(sizeof(struct linked_list));
