@@ -21,3 +21,15 @@ void linked_list_append(struct linked_list* ll, void* value) {
     }
     ll->size += 1;
 }
+
+void linked_list_free(struct linked_list* ll) {
+    struct node* current = ll->head;
+    
+    while (current != NULL) {
+        struct node* tmp = current;
+        current = current->next;
+        free(tmp);
+    }
+
+    free(ll);
+}
