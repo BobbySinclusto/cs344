@@ -27,7 +27,4 @@ struct linked_list* linked_list_init();
 // adds a value to the end of the linked list
 void linked_list_append(struct linked_list* ll, void* value);
 
-// frees all memory for the linked list
-void linked_list_free(struct linked_list*);
-
 #endif

@@ -22,22 +22,11 @@ void linked_list_append(struct linked_list* ll, void* value) {
     
     if (ll->last == NULL) {
         ll->head = new;
-        ll->last = new;
     }
     else {
         ll->last->next = new;
     }
-    ll->size += 1;
-}
 
-void linked_list_free(struct linked_list* ll) {
-    struct node* current = ll->head;
-    
-    while (current != NULL) {
-        struct node* tmp = current;
-        current = current->next;
-        free(tmp);
-    }
-
-    free(ll);
+    ll->last = new;
+    ll->length += 1;
 }
