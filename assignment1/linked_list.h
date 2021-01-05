@@ -10,14 +10,14 @@
 
 // Struct for individual nodes of the linked list
 struct node {
-    void* value;
-    struct node* next;
+    void *value;
+    struct node *next;
 };
 
 // Struct for linked list information
 struct linked_list {
-    struct node* head;
-    struct node* last;
+    struct node *head;
+    struct node *last;
     int length;
 };
 
@@ -25,6 +25,6 @@ struct linked_list {
 struct linked_list* linked_list_init();
 
 // adds a value to the end of the linked list
-void linked_list_append(struct linked_list* ll, void* value);
+void linked_list_append(struct linked_list *ll, void *value);
 
 #endif
