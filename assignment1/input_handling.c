@@ -11,7 +11,7 @@
 #include <errno.h>
 
 int get_input_range(int lower, int upper, const char *prompt, const char *error) {
-    printf(prompt);
+    printf("%s", prompt);
     char input[11];
     char *endptr = NULL;
     errno = 0;
@@ -27,7 +27,7 @@ int get_input_range(int lower, int upper, const char *prompt, const char *error)
         errno = 0;
         endptr = NULL;
         // Display error
-        printf(error);
+        printf("%s", error);
         // Get number from user
         fgets(input, 11, stdin);
         // Convert to integer:

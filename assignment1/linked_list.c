@@ -13,6 +13,7 @@ struct linked_list* linked_list_init() {
     ll->head = NULL;
     ll->last = NULL;
     ll->length = 0;
+    return ll;
 }
 
 void linked_list_append(struct linked_list *ll, void *value) {

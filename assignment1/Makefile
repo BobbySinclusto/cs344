@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -std=gnu99 -g
+CFLAGS= -std=gnu99 -Wall -g
 exe_file= movies
 
 $(exe_file): linked_list.o input_handling.o movies.o main.o

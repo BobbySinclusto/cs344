@@ -23,7 +23,7 @@ struct linked_list* load_from_csv(char *csv_file) {
     }
 
     char *line = NULL;
-    ssize_t n = 0;
+    size_t n = 0;
 
     // Skip the first line
     getline(&line, &n, movies_file);
