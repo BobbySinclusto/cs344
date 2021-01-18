@@ -13,7 +13,7 @@
 int main(int argc, char** argv) {
     // Check for correct number of arguments
     if (argc != 2) {
-        printf("Invalid number of arguments. Please use ./movies [filename] to run this program.\n");
+        printf("Invalid number of arguments.\nExample usage: ./movies movies_sample_1.csv\n");
         return EXIT_FAILURE;
     }
 
