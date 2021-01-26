@@ -77,7 +77,7 @@ struct linked_list* load_from_csv(FILE *movies_file) {
 void run_movies_menu() {
     while (1) {
         printf("1. Select file to process\n"
-            "2. Exit the program\n"
+            "2. Exit the program\n\n"
         );
         
         // get choice from user (1-2)
@@ -102,7 +102,7 @@ void process_files_menu() {
         printf("Which file do you want to process?\n"
             "Enter 1 to pick the largest file\n"
             "Enter 2 to pick the smallest file\n"
-            "Enter 3 to specify the name of a file\n"
+            "Enter 3 to specify the name of a file\n\n"
         );
         
         // get choice from user (1-3)
