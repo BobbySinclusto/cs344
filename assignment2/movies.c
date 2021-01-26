@@ -1,7 +1,7 @@
 /***************************************************************************
 ** File: movies.c
 ** Author: Allen Benjamin
-** Date: 01/04/2021
+** Date: 01/25/2021
 ** Description: Functions for working with the movie data
 **************************************************************************/
 
@@ -89,7 +89,6 @@ void run_movies_menu() {
                 process_files_menu();
                 break;
             case 2:
-                // TODO: Make sure this works correctly
                 return;
         }
     }
@@ -356,72 +355,6 @@ void free_movies(struct linked_list *movies) {
 
     // Free memory allocated for the linked list
     free(movies);
-}
-
-void filter_by_year(struct linked_list *movies, int year) {
-    char found = 0;
-    struct node *current = movies->head;
-    while (current != NULL) {
-        if (((struct movie*)current->value)->year == year) {
-            printf("%s\n", ((struct movie*)current->value)->title);
-            found = 1;
-        }
-        current = current->next;
-    }
-    if (!found) {
-        printf("No data about movies released in the year %d\n", year);
-    }
-    printf("\n");
-}
-
-void show_highest_ranked(struct linked_list *movies) {
-    int current_max = 0;
-    int current_year = 0;
-    struct movie *current_max_movie = NULL;
-
-    struct node *current = movies->head;
-    while (1) {
-        // If we're at the end of the list or we're transitioning to a new year, print the max
-        if (current == NULL || ((struct movie*)current->value)->year != current_year) {
-            // Make sure this isn't the first movie in the list before printing information about max for the current year
-            if (current_max_movie != NULL) {
-                printf("%d %0.1f %s\n", current_max_movie->year, current_max_movie->rating, current_max_movie->title);
-            }
-            if (current == NULL) {
-                break;
-            }
-            // Update things for the next year
-            current_max = ((struct movie*)current->value)->rating;
-            current_year = ((struct movie*)current->value)->year;
-            current_max_movie = (struct movie*)current->value;
-        }
-        else if (((struct movie*)current->value)->rating > current_max) {
-            current_max = ((struct movie*)current->value)->rating;
-            current_year = ((struct movie*)current->value)->year;
-            current_max_movie = (struct movie*)current->value;
-        }
-        current = current->next;
-    }
-    printf("\n");
-}
-
-void filter_by_language(struct linked_list *movies, char language[20]) {
-    struct node *current = movies->head;
-    char found = 0;
-    while (current != NULL) {
-        // Loop through every language
-        for (int i = 0; i < 5 && ((struct movie*)current->value)->languages[i][0] != '\x00'; ++i) {
-            if (strcmp(language, ((struct movie*)current->value)->languages[i]) == 0) {
-                printf("%d %s\n", ((struct movie*)current->value)->year, ((struct movie*)current->value)->title);
-                found = 1;
-            }
-        }
-        current = current->next;
-    }
-    if (!found) {
-        printf("No data about movies released in %s\n", language);
-    }
-    printf("\n");
 }
 
 struct node* merge(struct node *first, struct node *second) {

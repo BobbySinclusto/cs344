@@ -1,7 +1,7 @@
 /***************************************************************************
 ** File: movies.h
 ** Author: Allen Benjamin
-** Date: 01/04/2021
+** Date: 01/25/2021
 ** Description: Functions for working with the movie data
 **************************************************************************/
 
@@ -32,15 +32,6 @@ void free_movies(struct linked_list *movies);
 
 // Sorts movies by year released
 struct node* merge_sort(struct node *head, int length);
-
-// Show movies released in a specified year
-void filter_by_year(struct linked_list *movies, int year);
-
-// Show the highest ranked movie for each year
-void show_highest_ranked(struct linked_list *movies);
-
-// Show all movies for a specified language
-void filter_by_language(struct linked_list *movies, char language[20]);
 
 // Loads movies from largest csv file in directory, NULL if none exist
 struct linked_list* load_largest_file();
