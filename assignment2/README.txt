@@ -16,4 +16,4 @@ Compile:
     make
 
 Run:
-    ./movies_by_year filename
+    ./movies_by_year
