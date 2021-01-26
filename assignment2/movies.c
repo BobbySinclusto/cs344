@@ -295,7 +295,7 @@ void write_output_files(struct linked_list *movies) {
 
     // Create new directory
     mkdir(dirname, 0750);
-    printf("Created directory with name %s\n", dirname);
+    printf("Created directory with name %s\n\n", dirname);
 
     // Add files to new directory
     // Sort by release date to make this easier
