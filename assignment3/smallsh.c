@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <errno.h>
 
-// Command struct
+// struct to hold command information once it has been parsed
 struct command {
     int argc;
     char *argv[512];
@@ -88,8 +90,8 @@ void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only
     char *input_redir = strstr(cmd_string, " < ");
     if (input_redir != NULL) {
         // Update last_index if necessary
-        if ((int)(input_redir - cmd_string) + 1 < last_index) {
-            last_index = (int)(input_redir - cmd_string) + 1;
+        if ((int)(input_redir - cmd_string) < last_index) {
+            last_index = (int)(input_redir - cmd_string);
         }
         // Move past the redirection operator to the filename
         input_redir += 3;
@@ -103,8 +105,8 @@ void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only
     char *output_redir = strstr(cmd_string, " > ");
     if (output_redir != NULL) {
         // Update last_index if necessary
-        if ((int)(input_redir - cmd_string) + 1 < last_index) {
-            last_index = (int)(input_redir - cmd_string) + 1;
+        if ((int)(output_redir - cmd_string) < last_index) {
+            last_index = (int)(output_redir - cmd_string);
         }
         // Move past the redirection operator to the filename
         output_redir += 3;
@@ -135,18 +137,67 @@ void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only
 
 // Function to execute command, returns exit status if it is a foreground process, -1 if background
 int execute_command(struct command *cmd_buf) {
-    
-    // After forking, make sure we can open the files if necessary
+    // Open files if necessary
+    // TODO: record these in the background processes array
+    int input_fd = 0;
     if (cmd_buf->input_filename != NULL) {
-        int input_fd = open(cmd_buf->input_filename, O_RDONLY);
+        input_fd = open(cmd_buf->input_filename, O_RDONLY);
         if (input_fd == -1) {
-            printf("Unable to open file %s\n", cmd_buf->input_filename);
-            exit(1);
+            printf("cannot open %s for input\n", cmd_buf->input_filename);
+            return 1;
         }
-        if (dup2(input_fd, 0) == -1) {
-            printf("Unable to get file descriptor for %s\n", cmd_buf->input_filename);
-            exit(1);
+    }
+
+    int output_fd = 0;
+    if (cmd_buf->output_filename != NULL) {
+        output_fd = open(cmd_buf->output_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (output_fd == -1) {
+            printf("cannot open %s for output\n", cmd_buf->output_filename);
+            return 1;
         }
+    }
+    // Time to make a forkbomb
+    pid_t child_pid = fork();
+
+    if (child_pid == -1) {
+        printf("Fork failed\n");
+        return EXIT_FAILURE;
+    }
+    if (child_pid == 0) {
+        // This is the child process, execute the command
+        // Redirect i/o as necessary
+        if (cmd_buf->input_filename != NULL) {
+            if (dup2(input_fd, 0) == -1) {
+                printf("Unable to get file descriptor for %s\n", cmd_buf->input_filename);
+                exit(1);
+            }
+            close(input_fd);
+        }
+        if (cmd_buf->output_filename != NULL) {
+            if (dup2(output_fd, 1) == -1) {
+                printf("Unable to get file descriptor for %s\n", cmd_buf->output_filename);
+                exit(1);
+            }
+            close(output_fd);
+        }
+
+        // Ready to execute!
+        execvp(cmd_buf->argv[0], cmd_buf->argv);
+        // If we make it this far, something went wrong
+        if (errno == ENOEXEC) {
+            printf("%s: command not found\n", cmd_buf->argv[0]);
+        }
+        else {
+            printf("%s: no such file or directory\n", cmd_buf->argv[0]);
+        }
+        fflush(NULL);
+        exit(1);
+    }
+    else {
+        // This is the parent process, set foreground_process or update background_processes
+        int child_status;
+        child_pid = waitpid(child_pid, &child_status, 0);
+        return WEXITSTATUS(child_status);
     }
 
 
@@ -161,9 +212,6 @@ int execute_command(struct command *cmd_buf) {
 void clear_command(struct command *cmd_buf) {
     // Free string that was allocated to hold this command
     free(cmd_buf->argv[0]); // first argument is always the start of the string
-
-    // Close files for this command
-
     init_command(cmd_buf);
 }
 
@@ -230,7 +278,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     // TODO: Detect SIGSTP
-    
+
     char input[2048];
     struct command cmd_buf;
     init_command(&cmd_buf);
