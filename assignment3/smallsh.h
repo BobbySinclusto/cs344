@@ -2,6 +2,7 @@
 #define SMALLSH_H
 
 #include <stdbool.h>
+#include "dynarray.h"
 
 // struct to hold command information once it has been parsed
 struct command {
@@ -22,16 +23,19 @@ char* expand_cmd(char *input);
 void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only);
 
 // Function to execute command, returns exit status if it is a foreground process, -1 if background
-int execute_command(struct command *cmd_buf);
+void execute_command(struct command *cmd_buf, struct dynarray *bg_procs, char *last_status);
 
 // reset the command buffer
 void clear_command(struct command *cmd_buf);
 
 // Checks for builtin commands and comments/blank lines. Returns a number
 // corresponding to the command that was run
-int check_builtin_commands(char *input, int last_status);
+int check_builtin_commands(char *input, char *last_status);
 
 // A utility function for debugging
 void print_command(struct command *cmd_buf);
+
+// Run the shell!
+void run_shell();
 
 #endif

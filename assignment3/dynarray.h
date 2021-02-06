@@ -5,14 +5,14 @@
 struct dynarray {
     int size;
     int capacity;
-    void ** arr;
+    int *arr;
 };
 
 // Initialize the dynarray
 struct dynarray* dynarray_init();
 
 // Append an element to the array
-void dynarray_append(struct dynarray* arr, void *val);
+void dynarray_append(struct dynarray* arr, int val);
 
 // Remove an element from the array
 void dynarray_remove(struct dynarray* arr, int idx);
@@ -21,6 +21,6 @@ void dynarray_remove(struct dynarray* arr, int idx);
 void dynarray_free(struct dynarray* arr);
 
 // Gets an element from the dynarray at a specified index
-void* dynarray_get(struct dynarray* arr, int idx);
+int dynarray_get(struct dynarray* arr, int idx);
 
 #endif

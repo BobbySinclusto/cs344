@@ -129,14 +129,16 @@ void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only
 }
 
 // Function to execute command, returns exit status if it is a foreground process, -1 if background
-int execute_command(struct command *cmd_buf) {
+void execute_command(struct command *cmd_buf, struct dynarray *bg_procs, char *last_status) {
     // Open files if necessary
     int input_fd = 0;
     if (cmd_buf->input_filename != NULL) {
         input_fd = open(cmd_buf->input_filename, O_RDONLY);
         if (input_fd == -1) {
             printf("cannot open %s for input\n", cmd_buf->input_filename);
-            return 1;
+            fflush(stdout);
+            sprintf(last_status, "exit status %d", 1);
+            return;
         }
     }
 
@@ -145,7 +147,9 @@ int execute_command(struct command *cmd_buf) {
         output_fd = open(cmd_buf->output_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (output_fd == -1) {
             printf("cannot open %s for output\n", cmd_buf->output_filename);
-            return 1;
+            fflush(stdout);
+            sprintf(last_status, "exit status %d", 1);
+            return;
         }
     }
     // Time to make a forkbomb (jk)
@@ -153,7 +157,8 @@ int execute_command(struct command *cmd_buf) {
 
     if (child_pid == -1) {
         printf("Fork failed\n");
-        return EXIT_FAILURE;
+        sprintf(last_status, "exit status %d", 1);
+        return;
     }
     if (child_pid == 0) {
         // This is the child process, execute the command
@@ -186,20 +191,31 @@ int execute_command(struct command *cmd_buf) {
         exit(1);
     }
     else {
-        // This is the parent process, set foreground_process or update background_processes
-        // TODO: add background process
+        // This is the parent process
+        // check for background process
+        if (cmd_buf->background) {
+            // Display message for background process
+            printf("background pid is %d\n", child_pid);
+            fflush(stdout);
+            // Update background processes struct
+            dynarray_append(bg_procs, child_pid);
+            return;
+        }
+        // if this is a foreground process, wait for it to finish
         int child_status;
         child_pid = waitpid(child_pid, &child_status, 0);
-        return WEXITSTATUS(child_status);
+
+        if (WIFSIGNALED(child_status)) {
+            // Update status
+            sprintf(last_status, "terminated by signal %d", WTERMSIG(child_status));
+            // Print message
+            printf("%s\n", last_status);
+            fflush(stdout);
+            return;
+        }
+        // Update exit status
+        sprintf(last_status, "exit status %d", WEXITSTATUS(child_status));
     }
-
-
-    // If command should execute in background, print pid when it begins
-    // Background commands default to redirecting stdin and stdout to /dev/null
-    // When it terminates, print process id and exit status.
-
-    // If a command terminates after being killed, print message before continuing
-    return 0;
 }
 
 // reset the command buffer
@@ -209,7 +225,6 @@ void clear_command(struct command *cmd_buf) {
     init_command(cmd_buf);
 }
 
-// TODO: debug this
 void cd(char *input) {
     // Check if we need to cd to home directory
     if (input[2] == '\0') {
@@ -227,7 +242,7 @@ void cd(char *input) {
 
 // Checks for builtin commands and comments/blank lines. Returns a number
 // corresponding to the command that was run
-int check_builtin_commands(char *input, int last_status) {
+int check_builtin_commands(char *input, char *last_status) {
     // Check for comment/newline
     if (input[0] == '#' || input[0] == '\0') {
         return 0;
@@ -236,7 +251,7 @@ int check_builtin_commands(char *input, int last_status) {
         return 1;
     }
     if (strcmp(input, "status") == 0) {
-        printf("exit value %d\n", last_status);
+        printf("%s\n", last_status);
         fflush(stdout);
         return 2;
     }
@@ -258,4 +273,79 @@ void print_command(struct command *cmd_buf) {
     printf("Output file: %s\n", cmd_buf->output_filename);
     printf("Is background: %d\n\n", cmd_buf->background);
     fflush(stdout);
+}
+
+void check_bg_procs(struct dynarray *bg_procs) {
+    int i = 0;
+    while (i < bg_procs->size) {
+        int proc = dynarray_get(bg_procs, i);
+        int child_status;
+        if (waitpid(proc, &child_status, WNOHANG) != 0) {
+            // Print message
+            if (WIFEXITED(child_status)) {
+                printf("background pid %d is done: exit value %d\n", proc, WEXITSTATUS(child_status));
+            }
+            else {
+                printf("background pid %d is done: terminated by signal %d\n", proc, WTERMSIG(child_status));
+            }
+            fflush(stdout);
+            // Remove from bg_procs
+            dynarray_remove(bg_procs, i);
+        }
+        else {
+            i += 1;
+        }
+    }
+}
+
+void kill_all_bg_procs(struct dynarray *bg_procs) {
+    while (bg_procs->size > 0) {
+        // Send kill signal to process
+        int proc = dynarray_get(bg_procs, -1);
+        kill(proc, SIGKILL);
+        int child_status;
+        waitpid(proc, &child_status, 0);
+        dynarray_remove(bg_procs, -1);
+    }
+}
+
+void run_shell() {
+    // TODO: catch SIGINT and SIGTSTP
+    char input[2048];
+    struct command cmd_buf;
+    struct dynarray *bg_procs = dynarray_init();
+    init_command(&cmd_buf);
+    char last_status[30] = "exit value 0";
+    bool is_foreground_only = false;
+
+    while (1) {
+        // Check for background processes
+        check_bg_procs(bg_procs);
+
+        printf(": ");
+        fflush(stdout);
+        fgets(input, 2048, stdin);
+        // Get rid of newline character
+        input[strcspn(input, "\n")] = '\0';
+
+        int ran_builtin = check_builtin_commands(input, last_status);
+        if (ran_builtin >= 0) {
+            // Ran one of the builtin commands
+            if (ran_builtin == 1) {
+                // Ran exit command
+                // kill bg processes
+                kill_all_bg_procs(bg_procs);
+                // free bg processes struct
+                dynarray_free(bg_procs);
+                return;
+            }
+            // go back to prompt
+            continue;
+        }
+
+        parse_command(&cmd_buf, input, is_foreground_only);
+        //print_command(&cmd_buf);
+        execute_command(&cmd_buf, bg_procs, last_status);
+        clear_command(&cmd_buf);
+    }
 }
