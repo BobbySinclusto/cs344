@@ -9,14 +9,7 @@
 #include <signal.h>
 #include <errno.h>
 
-// struct to hold command information once it has been parsed
-struct command {
-    int argc;
-    char *argv[512];
-    char *input_filename;
-    char *output_filename;
-    bool background;
-};
+#include "smallsh.h"
 
 void init_command(struct command *cmd_buf) {
     cmd_buf->argc = 0;
@@ -138,7 +131,6 @@ void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only
 // Function to execute command, returns exit status if it is a foreground process, -1 if background
 int execute_command(struct command *cmd_buf) {
     // Open files if necessary
-    // TODO: record these in the background processes array
     int input_fd = 0;
     if (cmd_buf->input_filename != NULL) {
         input_fd = open(cmd_buf->input_filename, O_RDONLY);
@@ -156,7 +148,7 @@ int execute_command(struct command *cmd_buf) {
             return 1;
         }
     }
-    // Time to make a forkbomb
+    // Time to make a forkbomb (jk)
     pid_t child_pid = fork();
 
     if (child_pid == -1) {
@@ -190,11 +182,12 @@ int execute_command(struct command *cmd_buf) {
         else {
             printf("%s: no such file or directory\n", cmd_buf->argv[0]);
         }
-        fflush(NULL);
+        fflush(stdout);
         exit(1);
     }
     else {
         // This is the parent process, set foreground_process or update background_processes
+        // TODO: add background process
         int child_status;
         child_pid = waitpid(child_pid, &child_status, 0);
         return WEXITSTATUS(child_status);
@@ -209,6 +202,7 @@ int execute_command(struct command *cmd_buf) {
     return 0;
 }
 
+// reset the command buffer
 void clear_command(struct command *cmd_buf) {
     // Free string that was allocated to hold this command
     free(cmd_buf->argv[0]); // first argument is always the start of the string
@@ -221,7 +215,7 @@ void cd(char *input) {
     if (input[2] == '\0') {
         if (chdir(getenv("HOME")) != 0) {
             printf("no such directory: %s\n", getenv("HOME"));
-            fflush(NULL);
+            fflush(stdout);
         }
     }
     else {
@@ -243,7 +237,7 @@ int check_builtin_commands(char *input, int last_status) {
     }
     if (strcmp(input, "status") == 0) {
         printf("exit value %d\n", last_status);
-        fflush(NULL);
+        fflush(stdout);
         return 2;
     }
     // Make sure that cd isn't part of the start of the name of another command
@@ -254,11 +248,7 @@ int check_builtin_commands(char *input, int last_status) {
     return -1;
 }
 
-static void sigint_handler() {
-    // TODO: Make this do something useful
-    puts("yo\n");
-}
-
+// A utility function for debugging
 void print_command(struct command *cmd_buf) {
     printf("argc: %d\nargv: ", cmd_buf->argc);
     for (int i = 0; cmd_buf->argv[i] != NULL; ++i) {
@@ -267,52 +257,5 @@ void print_command(struct command *cmd_buf) {
     printf("\nInput file: %s\n", cmd_buf->input_filename);
     printf("Output file: %s\n", cmd_buf->output_filename);
     printf("Is background: %d\n\n", cmd_buf->background);
-    fflush(NULL);
-}
-
-int main(int argc, char **argv) {
-    // TODO: Detect SIGINT
-    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
-        printf("Unable to set signal handler for SIGINT.\n");
-        fflush(NULL);
-        return EXIT_FAILURE;
-    }
-    // TODO: Detect SIGSTP
-
-    char input[2048];
-    struct command cmd_buf;
-    init_command(&cmd_buf);
-    int last_status = 0;
-    bool is_foreground_only = false;
-
-    while (1) {
-        printf(": ");
-        fflush(NULL);
-        fgets(input, 2048, stdin);
-        // Get rid of newline character
-        input[strcspn(input, "\n")] = '\0';
-
-        int ran_builtin = check_builtin_commands(input, last_status);
-        if (ran_builtin >= 0) {
-            // Ran one of the builtin commands
-            if (ran_builtin == 1) {
-                // Ran exit command
-                return EXIT_SUCCESS;
-            }
-            // go back to prompt
-            continue;
-        }
-
-        parse_command(&cmd_buf, input, is_foreground_only);
-        print_command(&cmd_buf);
-        int exit_status = execute_command(&cmd_buf);
-        clear_command(&cmd_buf);
-        
-        // Update exit status if necessary
-        if (exit_status != -1) {
-            last_status = exit_status;
-        }
-    }
-
-    return EXIT_SUCCESS;
+    fflush(stdout);
 }
