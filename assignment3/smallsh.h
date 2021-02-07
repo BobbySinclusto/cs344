@@ -13,6 +13,9 @@ struct command {
     bool background;
 };
 
+// Function to initialize the signal handlers
+void setup_handlers();
+
 // Function to initialize command struct
 void init_command(struct command *cmd_buf);
 
@@ -34,6 +37,12 @@ int check_builtin_commands(char *input, char *last_status);
 
 // A utility function for debugging
 void print_command(struct command *cmd_buf);
+
+// Check if any background processes have finished
+void check_bg_procs(struct dynarray *bg_procs);
+
+// Kill all the children
+void kill_all_bg_procs(struct dynarray *bg_procs);
 
 // Run the shell!
 void run_shell();

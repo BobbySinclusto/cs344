@@ -11,6 +11,8 @@
 
 #include "smallsh.h"
 
+bool g_ignore_bg = false;
+
 void init_command(struct command *cmd_buf) {
     cmd_buf->argc = 0;
     cmd_buf->argv[0] = NULL;
@@ -21,6 +23,9 @@ void init_command(struct command *cmd_buf) {
 
 // Function to perform expansion in the command string. Returns a malloc'd string that should be freed
 char* expand_cmd(char *input) {
+    if (input[0] == '\0') {
+        return NULL;
+    }
     // Count number of expansion operators in command
     int exp_count = 0;
     for (int i = 0; i < strlen(input) - 1; ++i) {
@@ -60,16 +65,15 @@ char* expand_cmd(char *input) {
 }
 
 // Function to create command struct from user input string
-void parse_command(struct command *cmd_buf, char *input, bool is_foreground_only) {
-    // Perform expansion if necessary
-    char *cmd_string = expand_cmd(input);
-
+void parse_command(struct command *cmd_buf, char *cmd_string, bool is_foreground_only) {
     // Keep track of where the arguments stop and redirection/background operations start
     int last_index = strlen(cmd_string);
 
     // Check if this should run in background
     if (cmd_string[strlen(cmd_string) - 2] == ' ' && cmd_string[strlen(cmd_string) - 1] == '&') {
-        cmd_buf->background = true;
+        if (!g_ignore_bg) {
+            cmd_buf->background = true;
+        }
         last_index -= 2;
 
         // Set input_filename and output_filename to default to /dev/null
@@ -162,6 +166,13 @@ void execute_command(struct command *cmd_buf, struct dynarray *bg_procs, char *l
     }
     if (child_pid == 0) {
         // This is the child process, execute the command
+        // Reset SIGINT handler
+        struct sigaction SIGINT_action = {{0}};
+        SIGINT_action.sa_handler = SIG_DFL;
+        SIGINT_action.sa_flags = SA_RESTART;
+        sigfillset(&SIGINT_action.sa_mask);
+        sigaction(SIGINT, &SIGINT_action, NULL);
+
         // Redirect i/o as necessary
         if (cmd_buf->input_filename != NULL) {
             if (dup2(input_fd, 0) == -1) {
@@ -244,19 +255,19 @@ void cd(char *input) {
 // corresponding to the command that was run
 int check_builtin_commands(char *input, char *last_status) {
     // Check for comment/newline
-    if (input[0] == '#' || input[0] == '\0') {
+    if (input == NULL || input[0] == '#' || input[0] == '\0') {
         return 0;
     }
-    if (strcmp(input, "exit") == 0) {
+    if (strncmp(input, "exit", 4) == 0) {
         return 1;
     }
-    if (strcmp(input, "status") == 0) {
+    if (strncmp(input, "status", 6) == 0) {
         printf("%s\n", last_status);
         fflush(stdout);
         return 2;
     }
     // Make sure that cd isn't part of the start of the name of another command
-    if (strstr(input, "cd") == input && (input[2] == ' ' || input[2] == '\0')) {
+    if (strncmp(input, "cd", 2) == 0 && (input[2] == ' ' || input[2] == '\0')) {
         cd(input);
         return 3;
     }
@@ -309,8 +320,32 @@ void kill_all_bg_procs(struct dynarray *bg_procs) {
     }
 }
 
+void catchSIGTSTP(int signo) {
+    g_ignore_bg = !g_ignore_bg;
+    if (g_ignore_bg) {
+        write(STDOUT_FILENO, "\nEntering foreground-only mode (& is now ignored)\n: ", 52);
+    }
+    else {
+        write(STDOUT_FILENO, "\nExiting foreground-only mode\n: ", 32);
+    }
+}
+
+void setup_handlers() {
+    struct sigaction SIGINT_action = {{0}}, SIGTSTP_action = {{0}};
+
+    SIGINT_action.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &SIGINT_action, NULL);
+
+    SIGTSTP_action.sa_handler = catchSIGTSTP;
+    SIGTSTP_action.sa_flags = SA_RESTART;
+    sigfillset(&SIGTSTP_action.sa_mask);
+    sigaction(SIGTSTP, &SIGTSTP_action, NULL);
+}
+
 void run_shell() {
-    // TODO: catch SIGINT and SIGTSTP
+    // catch SIGINT and SIGTSTP
+    setup_handlers();
+
     char input[2048];
     struct command cmd_buf;
     struct dynarray *bg_procs = dynarray_init();
@@ -327,10 +362,16 @@ void run_shell() {
         fgets(input, 2048, stdin);
         // Get rid of newline character
         input[strcspn(input, "\n")] = '\0';
+        
+        // Perform expansion if necessary
+        char *cmd_string = expand_cmd(input);
 
-        int ran_builtin = check_builtin_commands(input, last_status);
+        // Check for builtin commands
+        int ran_builtin = check_builtin_commands(cmd_string, last_status);
         if (ran_builtin >= 0) {
             // Ran one of the builtin commands
+            // Free memory allocated for cmd_string
+            free(cmd_string);
             if (ran_builtin == 1) {
                 // Ran exit command
                 // kill bg processes
@@ -343,7 +384,7 @@ void run_shell() {
             continue;
         }
 
-        parse_command(&cmd_buf, input, is_foreground_only);
+        parse_command(&cmd_buf, cmd_string, is_foreground_only);
         //print_command(&cmd_buf);
         execute_command(&cmd_buf, bg_procs, last_status);
         clear_command(&cmd_buf);
