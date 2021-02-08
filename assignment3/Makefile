@@ -16,4 +16,4 @@ main.o: dynarray.h smallsh.h main.c
 
 .PHONY: clean
 clean:
-	rm -f *.o $(exe_file)
+	rm -rf *.o $(exe_file) junk junk2 ~/testdir*
