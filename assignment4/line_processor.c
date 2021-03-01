@@ -12,7 +12,6 @@ int ib_c_idx = 0; // index to take next line from
 int ib_count = 0;
 pthread_mutex_t ib_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t ib_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t ib_empty = PTHREAD_COND_INITIALIZER;
 
 // Space thread to plus thread
 char space_buffer[NUM_LINES][LINE_SIZE];
@@ -21,7 +20,6 @@ int sb_c_idx = 0;
 int sb_count = 0;
 pthread_mutex_t sb_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sb_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t sb_empty = PTHREAD_COND_INITIALIZER;
 
 // Plus thread to output thread
 char output_buffer[OUTPUT_SIZE];
@@ -30,7 +28,6 @@ int ob_count = 0;
 bool should_exit = false;
 pthread_mutex_t ob_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t ob_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t ob_empty = PTHREAD_COND_INITIALIZER;
 
 
 // These functions are mostly the same as the sample code that was given for the assignment
@@ -155,7 +152,13 @@ void* get_input(void *args) {
    char line[LINE_SIZE]; // Buffer to store line in until we can get a lock on input_buffer
 
    while (1) {
-      fgets(line, LINE_SIZE, stdin);
+      // Make sure there isn't a buffer overflow issue :)
+      if (ib_p_idx >= NUM_LINES - 1) {
+	 strncpy(line, "STOP\n", LINE_SIZE);
+      }
+      else {
+	 fgets(line, LINE_SIZE, stdin);
+      }
       // put the line in the input buffer
       put_ib(line);
 
